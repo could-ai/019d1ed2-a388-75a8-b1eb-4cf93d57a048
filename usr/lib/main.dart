@@ -6,41 +6,70 @@ void main() {
 }
 
 class TradingSignalApp extends StatelessWidget {
+  static final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.dark);
+
   const TradingSignalApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'SMC/ICT Market Analyzer',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData.dark().copyWith(
-        scaffoldBackgroundColor: const Color(0xFF0B0E14),
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Color(0xFF151A22),
-          elevation: 0,
-          centerTitle: true,
-          titleTextStyle: TextStyle(
-            color: Colors.white,
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 1.2,
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: themeNotifier,
+      builder: (_, ThemeMode currentMode, __) {
+        return MaterialApp(
+          title: 'SMC/ICT Market Analyzer',
+          debugShowCheckedModeBanner: false,
+          themeMode: currentMode,
+          theme: ThemeData.light().copyWith(
+            scaffoldBackgroundColor: const Color(0xFFF5F7FA),
+            appBarTheme: const AppBarTheme(
+              backgroundColor: Colors.white,
+              foregroundColor: Colors.black87,
+              elevation: 0,
+              centerTitle: true,
+              titleTextStyle: TextStyle(
+                color: Colors.black87,
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 1.2,
+              ),
+            ),
+            cardColor: Colors.white,
+            colorScheme: const ColorScheme.light(
+              primary: Color(0xFF2962FF),
+              secondary: Color(0xFF00C853),
+              surface: Colors.white,
+              error: Color(0xFFFF1744),
+            ),
+            dividerColor: Colors.grey[300],
           ),
-        ),
-        cardColor: const Color(0xFF151A22),
-        colorScheme: const ColorScheme.dark(
-          primary: Color(0xFF2962FF),
-          secondary: Color(0xFF00E676),
-          surface: Color(0xFF151A22),
-          error: Color(0xFFFF1744),
-        ),
-        textTheme: const TextTheme(
-          bodyLarge: TextStyle(color: Colors.white),
-          bodyMedium: TextStyle(color: Colors.white70),
-        ),
-      ),
-      initialRoute: '/',
-      routes: {
-        '/': (context) => const HomeScreen(),
+          darkTheme: ThemeData.dark().copyWith(
+            scaffoldBackgroundColor: const Color(0xFF0B0E14),
+            appBarTheme: const AppBarTheme(
+              backgroundColor: Color(0xFF151A22),
+              foregroundColor: Colors.white,
+              elevation: 0,
+              centerTitle: true,
+              titleTextStyle: TextStyle(
+                color: Colors.white,
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 1.2,
+              ),
+            ),
+            cardColor: const Color(0xFF151A22),
+            colorScheme: const ColorScheme.dark(
+              primary: Color(0xFF2962FF),
+              secondary: Color(0xFF00E676),
+              surface: Color(0xFF151A22),
+              error: Color(0xFFFF1744),
+            ),
+            dividerColor: const Color(0xFF2A2E39),
+          ),
+          initialRoute: '/',
+          routes: {
+            '/': (context) => const HomeScreen(),
+          },
+        );
       },
     );
   }
@@ -91,6 +120,7 @@ class MarketPair {
 }
 
 // --- MOCK DATA ---
+// Note: Real data requires a backend connection to a market data provider.
 
 final List<MarketPair> mockPairs = [
   MarketPair(
@@ -165,76 +195,121 @@ final List<MarketPair> mockPairs = [
 
 // --- SCREENS ---
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
   @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  bool _isLoading = false;
+
+  Future<void> _refreshData() async {
+    setState(() {
+      _isLoading = true;
+    });
+    
+    // Simulate network delay
+    await Future.delayed(const Duration(seconds: 2));
+    
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+      });
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Real data integration requires Supabase backend to securely store API keys. Showing mock data for now.'),
+          duration: Duration(seconds: 4),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final theme = Theme.of(context);
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('QUANTUM SIGNALS'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.notifications_none, color: Colors.white),
-            onPressed: () {},
+            icon: Icon(isDark ? Icons.light_mode : Icons.dark_mode),
+            onPressed: () {
+              TradingSignalApp.themeNotifier.value =
+                  isDark ? ThemeMode.light : ThemeMode.dark;
+            },
+            tooltip: 'Toggle Theme',
           ),
           IconButton(
-            icon: const Icon(Icons.settings_outlined, color: Colors.white),
-            onPressed: () {},
+            icon: const Icon(Icons.refresh),
+            onPressed: _isLoading ? null : _refreshData,
+            tooltip: 'Refresh Data',
           ),
         ],
       ),
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildMarketOverview(context),
-          const Padding(
-            padding: EdgeInsets.all(16.0),
-            child: Text(
-              'Active Signals (SMC & ICT)',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
+      body: RefreshIndicator(
+        onRefresh: _refreshData,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildMarketOverview(context),
+            if (_isLoading)
+              const LinearProgressIndicator(),
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Text(
+                'Active Signals (SMC & ICT)',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: theme.textTheme.bodyLarge?.color,
+                ),
               ),
             ),
-          ),
-          Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              itemCount: mockPairs.length,
-              itemBuilder: (context, index) {
-                final pair = mockPairs[index];
-                return _buildPairCard(context, pair);
-              },
+            Expanded(
+              child: ListView.builder(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                itemCount: mockPairs.length,
+                itemBuilder: (context, index) {
+                  final pair = mockPairs[index];
+                  return _buildPairCard(context, pair);
+                },
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildMarketOverview(BuildContext context) {
+    final theme = Theme.of(context);
     return Container(
       padding: const EdgeInsets.all(20),
-      decoration: const BoxDecoration(
-        color: Color(0xFF151A22),
+      decoration: BoxDecoration(
+        color: theme.cardColor,
         border: Border(
-          bottom: BorderSide(color: Color(0xFF2A2E39), width: 1),
+          bottom: BorderSide(color: theme.dividerColor, width: 1),
         ),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _buildOverviewStat('Win Rate', '84%', Colors.greenAccent),
-          _buildOverviewStat('Active Setups', '3', Colors.blueAccent),
-          _buildOverviewStat('Market Bias', 'Bullish', Colors.greenAccent),
+          _buildOverviewStat('Win Rate', '84%', const Color(0xFF00E676), context),
+          _buildOverviewStat('Active Setups', '3', const Color(0xFF2962FF), context),
+          _buildOverviewStat('Market Bias', 'Bullish', const Color(0xFF00E676), context),
         ],
       ),
     );
   }
 
-  Widget _buildOverviewStat(String label, String value, Color color) {
+  Widget _buildOverviewStat(String label, String value, Color color, BuildContext context) {
+    final theme = Theme.of(context);
     return Column(
       children: [
         Text(
@@ -248,9 +323,9 @@ class HomeScreen extends StatelessWidget {
         const SizedBox(height: 4),
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 12,
-            color: Colors.white54,
+            color: theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
           ),
         ),
       ],
@@ -258,6 +333,7 @@ class HomeScreen extends StatelessWidget {
   }
 
   Widget _buildPairCard(BuildContext context, MarketPair pair) {
+    final theme = Theme.of(context);
     Color signalColor;
     String signalText;
     IconData signalIcon;
@@ -293,12 +369,12 @@ class HomeScreen extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: const Color(0xFF151A22),
+          color: theme.cardColor,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFF2A2E39)),
+          border: Border.all(color: theme.dividerColor),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.2),
+              color: Colors.black.withOpacity(0.05),
               blurRadius: 8,
               offset: const Offset(0, 4),
             ),
@@ -314,18 +390,18 @@ class HomeScreen extends StatelessWidget {
                 children: [
                   Text(
                     pair.symbol,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      color: Colors.white,
+                      color: theme.textTheme.bodyLarge?.color,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     pair.name,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
-                      color: Colors.white54,
+                      color: theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
                     ),
                   ),
                 ],
@@ -339,10 +415,10 @@ class HomeScreen extends StatelessWidget {
                 children: [
                   Text(
                     pair.price.toStringAsFixed(pair.symbol.contains('JPY') ? 2 : 4),
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
-                      color: Colors.white,
+                      color: theme.textTheme.bodyLarge?.color,
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -395,6 +471,7 @@ class SignalDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     Color signalColor;
     switch (pair.signal) {
       case SignalType.buy:
@@ -412,66 +489,73 @@ class SignalDetailScreen extends StatelessWidget {
       appBar: AppBar(
         title: Text('${pair.symbol} Analysis'),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
+          icon: Icon(Icons.arrow_back_ios_new, color: theme.appBarTheme.foregroundColor, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
       ),
       body: SingleChildScrollView(
         child: Column(
           children: [
-            _buildHeader(signalColor),
-            _buildMockChart(),
+            _buildHeader(signalColor, context),
+            _buildMockChart(context),
             Padding(
               padding: const EdgeInsets.all(16.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildSectionTitle('Smart Money Concepts (SMC)'),
+                  _buildSectionTitle('Smart Money Concepts (SMC)', context),
                   _buildAnalysisCard(
                     icon: Icons.account_tree_outlined,
                     title: 'Market Structure',
                     content: pair.analysis.smcStructure,
                     color: Colors.blueAccent,
+                    context: context,
                   ),
                   _buildAnalysisCard(
                     icon: Icons.view_in_ar_outlined,
                     title: 'Order Blocks & FVG',
                     content: pair.analysis.smcOrderBlock,
                     color: Colors.purpleAccent,
+                    context: context,
                   ),
                   _buildAnalysisCard(
                     icon: Icons.water_drop_outlined,
                     title: 'Liquidity',
                     content: pair.analysis.smcLiquidity,
                     color: Colors.cyanAccent,
+                    context: context,
                   ),
                   const SizedBox(height: 24),
-                  _buildSectionTitle('Inner Circle Trader (ICT)'),
+                  _buildSectionTitle('Inner Circle Trader (ICT)', context),
                   _buildAnalysisCard(
                     icon: Icons.access_time,
                     title: 'Killzones & Time',
                     content: pair.analysis.ictKillzone,
                     color: Colors.orangeAccent,
+                    context: context,
                   ),
                   _buildAnalysisCard(
                     icon: Icons.track_changes_outlined,
                     title: 'ICT Setup',
                     content: pair.analysis.ictSetup,
                     color: Colors.deepOrangeAccent,
+                    context: context,
                   ),
                   const SizedBox(height: 24),
-                  _buildSectionTitle('Price Action'),
+                  _buildSectionTitle('Price Action', context),
                   _buildAnalysisCard(
                     icon: Icons.trending_up,
                     title: 'Overall Trend',
                     content: pair.analysis.priceActionTrend,
                     color: Colors.greenAccent,
+                    context: context,
                   ),
                   _buildAnalysisCard(
                     icon: Icons.horizontal_rule,
                     title: 'Key Levels',
                     content: pair.analysis.priceActionKeyLevel,
-                    color: Colors.yellowAccent,
+                    color: const Color(0xFFFDD835), // Yellow
+                    context: context,
                   ),
                   const SizedBox(height: 40),
                 ],
@@ -483,17 +567,18 @@ class SignalDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildHeader(Color signalColor) {
+  Widget _buildHeader(Color signalColor, BuildContext context) {
+    final theme = Theme.of(context);
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: const Color(0xFF151A22),
-        border: const Border(
-          bottom: BorderSide(color: Color(0xFF2A2E39), width: 1),
+        color: theme.cardColor,
+        border: Border(
+          bottom: BorderSide(color: theme.dividerColor, width: 1),
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.2),
+            color: Colors.black.withOpacity(0.05),
             blurRadius: 10,
             offset: const Offset(0, 5),
           ),
@@ -507,18 +592,18 @@ class SignalDetailScreen extends StatelessWidget {
             children: [
               Text(
                 pair.symbol,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 28,
                   fontWeight: FontWeight.bold,
-                  color: Colors.white,
+                  color: theme.textTheme.bodyLarge?.color,
                 ),
               ),
               const SizedBox(height: 4),
               Text(
                 'Timeframe: ${pair.timeframe}',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 14,
-                  color: Colors.white54,
+                  color: theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
                 ),
               ),
             ],
@@ -528,10 +613,10 @@ class SignalDetailScreen extends StatelessWidget {
             children: [
               Text(
                 pair.price.toStringAsFixed(pair.symbol.contains('JPY') ? 2 : 4),
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
-                  color: Colors.white,
+                  color: theme.textTheme.bodyLarge?.color,
                 ),
               ),
               const SizedBox(height: 4),
@@ -557,15 +642,16 @@ class SignalDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildMockChart() {
+  Widget _buildMockChart(BuildContext context) {
+    final theme = Theme.of(context);
     return Container(
       height: 200,
       width: double.infinity,
       margin: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF151A22),
+        color: theme.cardColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF2A2E39)),
+        border: Border.all(color: theme.dividerColor),
       ),
       child: Stack(
         children: [
@@ -586,7 +672,7 @@ class SignalDetailScreen extends StatelessWidget {
               ),
               child: const Text(
                 'Live Chart (Mock)',
-                style: TextStyle(color: Colors.white54, fontSize: 10),
+                style: TextStyle(color: Colors.white, fontSize: 10),
               ),
             ),
           ),
@@ -595,15 +681,16 @@ class SignalDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildSectionTitle(String title) {
+  Widget _buildSectionTitle(String title, BuildContext context) {
+    final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: 16.0, top: 8.0),
       child: Text(
         title,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 20,
           fontWeight: FontWeight.bold,
-          color: Colors.white,
+          color: theme.textTheme.bodyLarge?.color,
           letterSpacing: 0.5,
         ),
       ),
@@ -615,14 +702,16 @@ class SignalDetailScreen extends StatelessWidget {
     required String title,
     required String content,
     required Color color,
+    required BuildContext context,
   }) {
+    final theme = Theme.of(context);
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF151A22),
+        color: theme.cardColor,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFF2A2E39)),
+        border: Border.all(color: theme.dividerColor),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -642,18 +731,18 @@ class SignalDetailScreen extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
-                    color: Colors.white,
+                    color: theme.textTheme.bodyLarge?.color,
                   ),
                 ),
                 const SizedBox(height: 6),
                 Text(
                   content,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
-                    color: Colors.white70,
+                    color: theme.textTheme.bodyMedium?.color?.withOpacity(0.8),
                     height: 1.4,
                   ),
                 ),
